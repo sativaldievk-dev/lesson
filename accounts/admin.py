@@ -28,7 +28,14 @@ class CustomUserAdmin(UserAdmin):
     add_form = AdminUserCreationForm
     form = AdminUserChangeForm
     model = CustomUser
-    list_display = ("email", "phone_number", "is_staff", "is_active", "is_superuser")
+    list_display = (
+        "email",
+        "phone_number",
+        "birthdate",
+        "is_staff",
+        "is_active",
+        "is_superuser",
+    )
     list_filter = ("is_staff", "is_active", "is_superuser", "groups")
     search_fields = ("email", "phone_number")
     ordering = ("email",)
@@ -36,7 +43,7 @@ class CustomUserAdmin(UserAdmin):
 
     fieldsets = (
         (None, {"fields": ("email", "password")}),
-        ("Контактные данные", {"fields": ("phone_number",)}),
+        ("Контактные данные", {"fields": ("phone_number", "birthdate")}),
         (
             "Права доступа",
             {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")},

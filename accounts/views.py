@@ -3,13 +3,12 @@ from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .serializers import (
-    LoginSerializer,
+    CustomTokenObtainPairSerializer,
     LoginResponseSerializer,
+    LoginSerializer,
     RegisterSerializer,
     UserReadSerializer,
     ValidationErrorSerializer,
@@ -25,7 +24,8 @@ class RegisterView(generics.GenericAPIView):
         summary="Регистрация по email",
         description=(
             "Обычный пользователь может не передавать `phone_number`. Если номер указан, "
-            "он должен иметь формат +996 и ровно 9 цифр после кода страны."
+            "он должен иметь формат +996 и ровно 9 цифр после кода страны. "
+            "Поле `birthdate` принимается в формате YYYY-MM-DD и нужно для создания продуктов."
         ),
         request=RegisterSerializer,
         responses={
@@ -40,6 +40,7 @@ class RegisterView(generics.GenericAPIView):
                 "Регистрация без телефона",
                 value={
                     "email": "aliya@example.com",
+                    "birthdate": "1997-01-15",
                     "password": "<your password>",
                     "password_confirm": "<your password>",
                 },
@@ -57,7 +58,12 @@ class RegisterView(generics.GenericAPIView):
             ),
             OpenApiExample(
                 "Созданный пользователь",
-                value={"id": 1, "email": "aliya@example.com", "phone_number": ""},
+                value={
+                    "id": 1,
+                    "email": "aliya@example.com",
+                    "phone_number": "",
+                    "birthdate": "1997-01-15",
+                },
                 response_only=True,
                 status_codes=["201"],
             ),
@@ -113,7 +119,12 @@ class LoginView(APIView):
                 value={
                     "refresh": "<refresh token>",
                     "access": "<access token>",
-                    "user": {"id": 1, "email": "aliya@example.com", "phone_number": ""},
+                    "user": {
+                        "id": 1,
+                        "email": "aliya@example.com",
+                        "phone_number": "",
+                        "birthdate": None,
+                    },
                 },
                 response_only=True,
                 status_codes=["200"],
@@ -131,7 +142,7 @@ class LoginView(APIView):
         serializer = LoginSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        refresh = RefreshToken.for_user(user)
+        refresh = CustomTokenObtainPairSerializer.get_token(user)
         return Response(
             {
                 "refresh": str(refresh),
@@ -143,7 +154,7 @@ class LoginView(APIView):
 
 
 class EmailTokenObtainPairView(TokenObtainPairView):
-    serializer_class = TokenObtainPairSerializer
+    serializer_class = CustomTokenObtainPairSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
 

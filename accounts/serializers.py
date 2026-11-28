@@ -1,6 +1,7 @@
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
 
@@ -8,7 +9,7 @@ User = get_user_model()
 class UserReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "email", "phone_number")
+        fields = ("id", "email", "phone_number", "birthdate")
         read_only_fields = fields
 
 
@@ -28,6 +29,7 @@ class LoginResponseSerializer(serializers.Serializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(help_text="Уникальный email для входа.")
+    birthdate = serializers.DateField(required=False, allow_null=True)
     phone_number = serializers.CharField(
         required=False,
         allow_blank=True,
@@ -46,7 +48,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("email", "phone_number", "password", "password_confirm")
+        fields = ("email", "phone_number", "birthdate", "password", "password_confirm")
 
     def validate_email(self, value):
         email = value.strip().casefold()
@@ -88,3 +90,13 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError({"detail": "Неверный email или пароль."})
         attrs["user"] = user
         return attrs
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Issue Simple JWT tokens with the user's birthdate claim."""
+
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token["birthdate"] = user.birthdate.isoformat() if user.birthdate else None
+        return token

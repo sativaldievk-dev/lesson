@@ -19,13 +19,16 @@ python manage.py runserver
 
 ## API
 
-- `POST /api/register/` — регистрация; `phone_number` можно пропустить.
+- `POST /api/register/` — регистрация; `phone_number` и `birthdate` можно пропустить.
+  Дата рождения задается как `YYYY-MM-DD`.
 - `POST /api/login/` — вход по email и паролю; возвращает access и refresh JWT.
 - `POST /api/token/` — получение стандартной пары Simple JWT.
 - `POST /api/token/refresh/` — получение нового access JWT.
 - `GET /api/me/` — данные вошедшего пользователя (нужен `Authorization: Bearer <access>`).
 - `GET /api/schema/` — OpenAPI-схема.
 - `GET /api/docs/` — Swagger UI.
+- `POST /api/products/` — создание продукта с access JWT; дата рождения в токене должна
+  подтверждать возраст 18 лет или старше.
 - `/admin/` — Django Admin.
 
 Номер телефона задается только в формате E.164 `+996` и ровно 9 цифр после кода страны, например `+996555123456`. Для обычного пользователя поле необязательно; для суперпользователя оно обязательно.

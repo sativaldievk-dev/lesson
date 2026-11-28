@@ -1,5 +1,17 @@
 from rest_framework.permissions import BasePermission
 
+from common.validators import validate_birthdate_from_token
+
+
+class ProductCreateAgePermission(BasePermission):
+    """Allow authenticated users to create products only when their JWT has a valid age."""
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        validate_birthdate_from_token(request.auth)
+        return True
+
 
 class IsModerator(BasePermission):
     """Allow staff users to read and manage products, except creating them."""

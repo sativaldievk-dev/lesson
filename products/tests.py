@@ -1,8 +1,14 @@
-from django.contrib.auth import get_user_model
-from django.urls import reverse
-from django.test import TestCase
-from rest_framework.test import APIClient
+from datetime import date
 
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import AccessToken
+
+from common.validators import validate_birthdate_from_token
 from .models import Product
 
 User = get_user_model()
@@ -115,3 +121,86 @@ class ProductModeratorPermissionTests(TestCase):
                 self.assertEqual(response.status_code, 401)
 
         self.assertTrue(Product.objects.filter(pk=self.product.pk).exists())
+
+
+class ProductCreateAgeTests(TestCase):
+    password = "M0untain-River-2026!"
+
+    def setUp(self):
+        self.client = APIClient()
+        self.create_url = reverse("product-list")
+        self.product_data = {
+            "name": "Allowed product",
+            "description": "Created by an adult",
+            "price": "10.00",
+        }
+
+    def authorize_with_token(self, user):
+        response = self.client.post(
+            "/api/token/",
+            {"email": user.email, "password": self.password},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
+
+    def test_adult_can_create_product(self):
+        user = User.objects.create_user(
+            email="adult@example.com",
+            password=self.password,
+            birthdate=date(1990, 5, 12),
+        )
+        self.authorize_with_token(user)
+
+        response = self.client.post(self.create_url, self.product_data, format="json")
+
+        self.assertEqual(response.status_code, 201, response.data)
+        product = Product.objects.get(pk=response.data["id"])
+        self.assertEqual(product.created_by, user)
+
+    def test_underage_user_cannot_create_product(self):
+        today = timezone.localdate()
+        user = User.objects.create_user(
+            email="underage@example.com",
+            password=self.password,
+            birthdate=date(today.year - 17, today.month, today.day),
+        )
+        self.authorize_with_token(user)
+
+        response = self.client.post(self.create_url, self.product_data, format="json")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            str(response.data["detail"]),
+            "Вам должно быть 18 лет, чтобы создать продукт.",
+        )
+        self.assertFalse(Product.objects.exists())
+
+    def test_token_without_birthdate_cannot_create_product(self):
+        user = User.objects.create_user(email="missing@example.com", password=self.password)
+        token = AccessToken.for_user(user)
+        if "birthdate" in token:
+            del token["birthdate"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {str(token)}")
+
+        response = self.client.post(self.create_url, self.product_data, format="json")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            str(response.data["detail"]),
+            "Укажите дату рождения, чтобы создать продукт.",
+        )
+        self.assertFalse(Product.objects.exists())
+
+    def test_age_uses_month_and_day_not_only_birth_year(self):
+        today = date(2026, 11, 28)
+
+        self.assertEqual(
+            validate_birthdate_from_token({"birthdate": "2008-11-28"}, today=today),
+            date(2008, 11, 28),
+        )
+        with self.assertRaisesMessage(
+            PermissionDenied,
+            "Вам должно быть 18 лет, чтобы создать продукт.",
+        ):
+            validate_birthdate_from_token({"birthdate": "2008-11-29"}, today=today)

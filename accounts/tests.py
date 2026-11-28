@@ -9,6 +9,7 @@ from django.db import IntegrityError
 from django.test import TestCase
 from rest_framework.test import APIClient
 import yaml
+from rest_framework_simplejwt.tokens import AccessToken
 
 from .admin import AdminUserCreationForm
 from .serializers import RegisterSerializer
@@ -47,6 +48,45 @@ class RegistrationAndLoginTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
         self.assertIn("access", response.data)
         self.assertIn("refresh", response.data)
+
+    def test_registration_accepts_birthdate_and_login_token_contains_it(self):
+        birthdate = "2000-03-14"
+        registered = self.client.post(
+            "/api/register/",
+            {
+                "email": "born@example.com",
+                "birthdate": birthdate,
+                "password": self.password,
+                "password_confirm": self.password,
+            },
+            format="json",
+        )
+        self.assertEqual(registered.status_code, 201, registered.data)
+        self.assertEqual(registered.data["birthdate"], birthdate)
+
+        login = self.client.post(
+            "/api/login/",
+            {"email": "born@example.com", "password": self.password},
+            format="json",
+        )
+        self.assertEqual(login.status_code, 200, login.data)
+        self.assertEqual(AccessToken(login.data["access"])["birthdate"], birthdate)
+
+        pair = self.client.post(
+            "/api/token/",
+            {"email": "born@example.com", "password": self.password},
+            format="json",
+        )
+        self.assertEqual(pair.status_code, 200, pair.data)
+        self.assertEqual(AccessToken(pair.data["access"])["birthdate"], birthdate)
+
+        refreshed = self.client.post(
+            "/api/token/refresh/",
+            {"refresh": pair.data["refresh"]},
+            format="json",
+        )
+        self.assertEqual(refreshed.status_code, 200, refreshed.data)
+        self.assertEqual(AccessToken(refreshed.data["access"])["birthdate"], birthdate)
 
     def test_registration_rejects_duplicate_email_and_password_mismatch(self):
         User.objects.create_user(email="aliya@example.com", password=self.password)
@@ -240,4 +280,3 @@ class JwtAndSwaggerTests(TestCase):
             "/api/token/refresh/",
         ):
             self.assertIn(route, schema_data["paths"])
-

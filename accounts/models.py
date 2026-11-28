@@ -56,6 +56,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         validators=[kyrgyz_phone_validator],
         help_text="Кыргызский номер в формате +996XXXXXXXXX; для суперпользователя обязателен.",
     )
+    birthdate = models.DateField("дата рождения", null=True, blank=True)
     is_staff = models.BooleanField("доступ в админку", default=False)
     is_active = models.BooleanField("активен", default=True)
     date_joined = models.DateTimeField("дата регистрации", default=timezone.now)
